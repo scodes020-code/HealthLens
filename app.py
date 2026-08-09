@@ -1,4 +1,20 @@
 
+# =========================================================
+# Health Symptom Checker — run with: streamlit run app.py
+# =========================================================
+# Needs these files in the same folder:
+#   - disease_knowledge_base.csv   (built by build_model.py)
+#   - bmi_risk_model.pkl           (built by build_model.py)
+#
+# Feedback addressed in this version:
+#   1. Weighted/specificity-based scoring, not plain overlap
+#   2. General self-care suggestions for low-risk matches (never dosages)
+#   3. In-app feedback box -> emailed straight to your Gmail (+ feedback.csv backup)
+#   4. Lay-language symptom synonyms + fuzzy matching
+#   5. "Browse by illness" tab (illness-first, not just symptom-first)
+#   6. Age / height / weight / lifestyle intake, BMI risk model wired in
+#   7. Combines 1+6 so you get two distinct signals instead of one flat score
+
 import streamlit as st
 import pandas as pd
 import ast
@@ -9,10 +25,16 @@ import urllib.parse
 from datetime import datetime
 
 import joblib
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 st.set_page_config(page_title="Health Symptom Checker", page_icon="🩺", layout="wide")
 
-
+# -----------------------------------------------------------
+# Lay-language -> knowledge-base symptom synonyms (feedback #4)
+# Extend this dict any time a user reports a term that doesn't match.
+# -----------------------------------------------------------
 SYNONYMS = {
     "throwing up": "vomiting", "puking": "vomiting", "sick to stomach": "nausea",
     "stomach ache": "stomach pain", "belly ache": "belly pain", "tummy pain": "stomach pain",
@@ -46,7 +68,9 @@ SYNONYMS = {
 }
 
 
-
+# -----------------------------------------------------------
+# Load data once
+# -----------------------------------------------------------
 @st.cache_data
 def load_knowledge_base():
     df = pd.read_csv('disease_knowledge_base.csv')
@@ -64,7 +88,9 @@ bmi_model = load_bmi_model()
 all_symptoms = sorted(set().union(*kb_df['symptoms']))
 all_diseases = sorted(kb_df['disease'].unique())
 
-x
+# Specificity weight per symptom (feedback #1): a symptom that appears in
+# fewer diseases is more diagnostic, so it should count for more than a
+# generic symptom like "fatigue" that shows up almost everywhere.
 @st.cache_data
 def symptom_weights(_kb_df):
     counts = {}
@@ -89,7 +115,9 @@ def normalize_symptom(raw):
     return close[0] if close else None
 
 
-
+# -----------------------------------------------------------
+# Prediction logic — weighted match instead of plain overlap
+# -----------------------------------------------------------
 def predict_health_issue(user_symptoms, top_n=5):
     user_set = set(user_symptoms)
     results = []
@@ -116,7 +144,8 @@ def predict_health_issue(user_symptoms, top_n=5):
     return sorted(results, key=lambda x: x['score'], reverse=True)[:top_n]
 
 
-def save_feedback(name, message):
+def save_feedback_to_csv(name, message):
+    """Always keep a local backup, even if email sending fails or isn't configured."""
     file_exists = os.path.exists('feedback.csv')
     with open('feedback.csv', 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -125,7 +154,54 @@ def save_feedback(name, message):
         writer.writerow([datetime.now().isoformat(timespec='seconds'), name, message])
 
 
+def send_feedback_email(name, message):
+    """
+    Emails feedback straight to your Gmail using an App Password.
+    Reads credentials from Streamlit secrets (.streamlit/secrets.toml or
+    the "Secrets" panel in Streamlit Community Cloud) — never hardcode
+    your password in this file.
 
+    Required secrets:
+        GMAIL_ADDRESS     = "scodes020@gmail.com"
+        GMAIL_APP_PASSWORD = "ksjd geiq kzsb ssnw"   # 16-char App Password
+        FEEDBACK_TO        = "scodes020@gmail.com" # where it lands (can be same as above)
+    """
+    try:
+        gmail_address = st.secrets["GMAIL_ADDRES"]
+        gmail_app_password = st.secrets["GMAIL_APP_PASSWORD"]
+        feedback_to = st.secrets.get("FEEDBACK_TO", gmail_address)
+    except Exception:
+        return False, "Email not configured yet (missing secrets)."
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Health Symptom Checker feedback from {name or 'Anonymous'}"
+    msg["From"] = gmail_address
+    msg["To"] = feedback_to
+    msg.set_content(
+        f"From: {name or 'Anonymous'}\n"
+        f"Time: {datetime.now().isoformat(timespec='seconds')}\n\n"
+        f"{message}"
+    )
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(gmail_address, gmail_app_password)
+            server.send_message(msg)
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def save_feedback(name, message):
+    """Try email first; CSV backup always happens regardless of email outcome."""
+    save_feedback_to_csv(name, message)
+    return send_feedback_email(name, message)
+
+
+# -----------------------------------------------------------
+# UI
+# -----------------------------------------------------------
 st.title("🩺 Health Symptom Checker")
 st.warning(
     "⚠️ This tool provides informational suggestions only and is **not a medical diagnosis**. "
@@ -136,7 +212,7 @@ tab_symptoms, tab_browse, tab_feedback = st.tabs(
     ["🔍 Check my symptoms", "📖 Browse by illness", "💬 Feedback"]
 )
 
-x-
+# ---------------- TAB 1: symptom-first checker ----------------
 with tab_symptoms:
     name = st.text_input("Your name")
 
@@ -217,6 +293,7 @@ with tab_symptoms:
                         query = urllib.parse.quote(f"{r['disease']} symptoms causes treatment")
                         st.link_button("🔎 Search more about this", f"https://www.google.com/search?q={query}")
 
+                # Feedback #6/#7: separate lifestyle-risk signal, kept distinct from the symptom match
                 if bmi_model is not None and 'bmi_value' in dir() and bmi_value:
                     risk_prob = bmi_model.predict_proba([[bmi_value]])[0][1]
                     st.markdown("---")
@@ -234,7 +311,7 @@ with tab_symptoms:
                 "please see a doctor or seek emergency care."
             )
 
-
+# ---------------- TAB 2: illness-first browser (feedback #5) ----------------
 with tab_browse:
     st.subheader("Look up an illness directly")
     st.caption("Not sure how to describe your symptoms? Search for an illness you suspect and see what it typically involves.")
@@ -258,7 +335,7 @@ with tab_browse:
         query = urllib.parse.quote(f"{chosen_disease} symptoms causes treatment")
         st.link_button("🔎 Search more about this", f"https://www.google.com/search?q={query}")
 
-
+# ---------------- TAB 3: feedback box (feedback #3) ----------------
 with tab_feedback:
     st.subheader("Send feedback or report an issue")
     fb_name = st.text_input("Your name (optional)", key="fb_name")
@@ -267,5 +344,11 @@ with tab_feedback:
         if not fb_message.strip():
             st.error("Please write a message before submitting.")
         else:
-            save_feedback(fb_name, fb_message.strip())
-            st.success("Thanks — your feedback was recorded!")
+            sent, error = save_feedback(fb_name, fb_message.strip())
+            if sent:
+                st.success("Thanks — your feedback was sent!")
+            else:
+                # Still saved to feedback.csv even though email didn't go out
+                st.success("Thanks — your feedback was recorded!")
+                if error and "not configured" not in error:
+                    st.caption(f"(Note for app owner: email send failed — {error})")
