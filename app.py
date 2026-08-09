@@ -12,10 +12,7 @@ import joblib
 
 st.set_page_config(page_title="Health Symptom Checker", page_icon="🩺", layout="wide")
 
-# -----------------------------------------------------------
-# Lay-language -> knowledge-base symptom synonyms (feedback #4)
-# Extend this dict any time a user reports a term that doesn't match.
-# -----------------------------------------------------------
+
 SYNONYMS = {
     "throwing up": "vomiting", "puking": "vomiting", "sick to stomach": "nausea",
     "stomach ache": "stomach pain", "belly ache": "belly pain", "tummy pain": "stomach pain",
@@ -49,9 +46,7 @@ SYNONYMS = {
 }
 
 
-# -----------------------------------------------------------
-# Load data once
-# -----------------------------------------------------------
+
 @st.cache_data
 def load_knowledge_base():
     df = pd.read_csv('disease_knowledge_base.csv')
@@ -69,9 +64,7 @@ bmi_model = load_bmi_model()
 all_symptoms = sorted(set().union(*kb_df['symptoms']))
 all_diseases = sorted(kb_df['disease'].unique())
 
-# Specificity weight per symptom (feedback #1): a symptom that appears in
-# fewer diseases is more diagnostic, so it should count for more than a
-# generic symptom like "fatigue" that shows up almost everywhere.
+x
 @st.cache_data
 def symptom_weights(_kb_df):
     counts = {}
@@ -96,9 +89,7 @@ def normalize_symptom(raw):
     return close[0] if close else None
 
 
-# -----------------------------------------------------------
-# Prediction logic — weighted match instead of plain overlap
-# -----------------------------------------------------------
+
 def predict_health_issue(user_symptoms, top_n=5):
     user_set = set(user_symptoms)
     results = []
@@ -134,9 +125,7 @@ def save_feedback(name, message):
         writer.writerow([datetime.now().isoformat(timespec='seconds'), name, message])
 
 
-# -----------------------------------------------------------
-# UI
-# -----------------------------------------------------------
+
 st.title("🩺 Health Symptom Checker")
 st.warning(
     "⚠️ This tool provides informational suggestions only and is **not a medical diagnosis**. "
@@ -147,7 +136,7 @@ tab_symptoms, tab_browse, tab_feedback = st.tabs(
     ["🔍 Check my symptoms", "📖 Browse by illness", "💬 Feedback"]
 )
 
-# ---------------- TAB 1: symptom-first checker ----------------
+x-
 with tab_symptoms:
     name = st.text_input("Your name")
 
@@ -228,7 +217,6 @@ with tab_symptoms:
                         query = urllib.parse.quote(f"{r['disease']} symptoms causes treatment")
                         st.link_button("🔎 Search more about this", f"https://www.google.com/search?q={query}")
 
-                # Feedback #6/#7: separate lifestyle-risk signal, kept distinct from the symptom match
                 if bmi_model is not None and 'bmi_value' in dir() and bmi_value:
                     risk_prob = bmi_model.predict_proba([[bmi_value]])[0][1]
                     st.markdown("---")
@@ -246,7 +234,7 @@ with tab_symptoms:
                 "please see a doctor or seek emergency care."
             )
 
-# ---------------- TAB 2: illness-first browser (feedback #5) ----------------
+
 with tab_browse:
     st.subheader("Look up an illness directly")
     st.caption("Not sure how to describe your symptoms? Search for an illness you suspect and see what it typically involves.")
@@ -270,7 +258,7 @@ with tab_browse:
         query = urllib.parse.quote(f"{chosen_disease} symptoms causes treatment")
         st.link_button("🔎 Search more about this", f"https://www.google.com/search?q={query}")
 
-# ---------------- TAB 3: feedback box (feedback #3) ----------------
+
 with tab_feedback:
     st.subheader("Send feedback or report an issue")
     fb_name = st.text_input("Your name (optional)", key="fb_name")
