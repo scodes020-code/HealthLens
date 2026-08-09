@@ -23,7 +23,6 @@ import os
 import difflib
 import urllib.parse
 from datetime import datetime
-
 import joblib
 import smtplib
 import ssl
