@@ -23,7 +23,7 @@ import os
 import difflib
 import urllib.parse
 from datetime import datetime
-import pickle
+import joblib
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -79,8 +79,7 @@ def load_knowledge_base():
 @st.cache_resource
 def load_bmi_model():
     if os.path.exists('bmi_risk_model.pkl'):
-        with open('bmi_risk_model.pkl', 'rb') as f:
-            return pickle.load(f)
+        return joblib.load('bmi_risk_model.pkl')
     return None
 
 kb_df = load_knowledge_base()
