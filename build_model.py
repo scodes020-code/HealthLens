@@ -1,18 +1,3 @@
-# =========================================================
-# STEP 1: BUILD THE MODEL — run this once in Google Colab
-# =========================================================
-# What this does:
-#   1. Merges dataset.csv + disease_data.csv into one disease knowledge base
-#      (symptoms, description, cures, doctor type per disease)
-#   2. Trains a small BMI risk model on synthetic_disease_risk_dataset.csv
-#   3. Saves both as files you'll load later in your Streamlit app
-#
-# Before running: upload these files to your Colab session (left sidebar > Files > upload):
-#   - dataset.csv
-#   - disease_data.csv
-#   - Disease_Description.csv
-#   - Testing.csv
-#   - synthetic_disease_risk_dataset_csv.csv   (rename your .crdownload file to end in .csv first)
 
 import pandas as pd
 import ast
@@ -21,29 +6,23 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 
-# -----------------------------------------------------------
-# PART A — Build the disease knowledge base (symptoms + info)
-# -----------------------------------------------------------
-
 d1 = pd.read_csv('dataset.csv')
 d2 = pd.read_csv('disease_data.csv')
 desc = pd.read_csv('Disease_Description.csv')
-test_csv = pd.read_csv('Testing.csv')  # also used as a 3rd symptom source — this is what closes the coverage gap
+test_csv = pd.read_csv('Testing.csv')  
 
-# Clean up disease names so matching works (lowercase, no extra spaces)
 d1['disease'] = d1['disease'].str.strip().str.lower()
 d1['symptom_list'] = d1['symptoms'].apply(lambda x: set(s.strip().lower() for s in str(x).split(',')))
 
 d2['Disease'] = d2['Disease'].str.strip().str.lower()
 d2['symptom_list'] = d2['Symptom'].apply(lambda x: set(s.strip().lower() for s in ast.literal_eval(x)))
 
-# Fix known duplicate/typo disease names here as you find them.
-# Example fix already needed in this dataset:
+
 d2['Disease'] = d2['Disease'].replace({'fibromyalgi': 'fibromyalgia'})
 
 desc['Disease'] = desc['Disease'].str.strip().str.lower()
 
-# Testing.csv is one-hot symptom columns + a prognosis column — convert each row into a symptom set
+
 symptom_cols = [c for c in test_csv.columns if c != 'prognosis']
 test_csv['disease'] = test_csv['prognosis'].str.strip().str.lower()
 test_csv['symptom_list'] = test_csv.apply(
@@ -90,9 +69,7 @@ kb_df = pd.DataFrame([
 kb_df.to_csv('disease_knowledge_base.csv', index=False)
 print(f"Knowledge base built: {len(kb_df)} diseases saved to disease_knowledge_base.csv")
 
-# -----------------------------------------------------------
-# PART B — Train the BMI general-risk model
-# -----------------------------------------------------------
+
 
 risk_df = pd.read_csv('synthetic_disease_risk_dataset_csv.csv')
 risk_df = risk_df.dropna(subset=['Disease_Risk'])
