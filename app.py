@@ -1,4 +1,3 @@
-
 # =========================================================
 # Health Symptom Checker — run with: streamlit run app.py
 # =========================================================
@@ -23,6 +22,7 @@ import os
 import difflib
 import urllib.parse
 from datetime import datetime
+
 import joblib
 import smtplib
 import ssl
@@ -143,17 +143,17 @@ def predict_health_issue(user_symptoms, top_n=5):
     return sorted(results, key=lambda x: x['score'], reverse=True)[:top_n]
 
 
-def save_feedback_to_csv(name, message):
+def save_feedback_to_csv(name, email, message):
     """Always keep a local backup, even if email sending fails or isn't configured."""
     file_exists = os.path.exists('feedback.csv')
     with open('feedback.csv', 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(['timestamp', 'name', 'message'])
-        writer.writerow([datetime.now().isoformat(timespec='seconds'), name, message])
+            writer.writerow(['timestamp', 'name', 'email', 'message'])
+        writer.writerow([datetime.now().isoformat(timespec='seconds'), name, email, message])
 
 
-def send_feedback_email(name, message):
+def send_feedback_email(name, email, message):
     """
     Emails feedback straight to your Gmail using an App Password.
     Reads credentials from Streamlit secrets (.streamlit/secrets.toml or
@@ -176,8 +176,12 @@ def send_feedback_email(name, message):
     msg["Subject"] = f"Health Symptom Checker feedback from {name or 'Anonymous'}"
     msg["From"] = gmail_address
     msg["To"] = feedback_to
+    if email:
+        # Lets you hit "Reply" in Gmail and it goes straight to the user
+        msg["Reply-To"] = email
     msg.set_content(
         f"From: {name or 'Anonymous'}\n"
+        f"Email: {email or 'Not provided'}\n"
         f"Time: {datetime.now().isoformat(timespec='seconds')}\n\n"
         f"{message}"
     )
@@ -192,10 +196,10 @@ def send_feedback_email(name, message):
         return False, str(e)
 
 
-def save_feedback(name, message):
+def save_feedback(name, email, message):
     """Try email first; CSV backup always happens regardless of email outcome."""
-    save_feedback_to_csv(name, message)
-    return send_feedback_email(name, message)
+    save_feedback_to_csv(name, email, message)
+    return send_feedback_email(name, email, message)
 
 
 # -----------------------------------------------------------
@@ -338,12 +342,17 @@ with tab_browse:
 with tab_feedback:
     st.subheader("Send feedback or report an issue")
     fb_name = st.text_input("Your name (optional)", key="fb_name")
+    fb_email = st.text_input("Your email *", key="fb_email")
     fb_message = st.text_area("What's on your mind?")
     if st.button("Submit feedback"):
-        if not fb_message.strip():
+        if not fb_email.strip():
+            st.error("Please enter your email so we can reply to you.")
+        elif "@" not in fb_email.strip() or "." not in fb_email.strip().split("@")[-1]:
+            st.error("That email doesn't look right — please double-check it.")
+        elif not fb_message.strip():
             st.error("Please write a message before submitting.")
         else:
-            sent, error = save_feedback(fb_name, fb_message.strip())
+            sent, error = save_feedback(fb_name, fb_email.strip(), fb_message.strip())
             if sent:
                 st.success("Thanks — your feedback was sent!")
             else:
