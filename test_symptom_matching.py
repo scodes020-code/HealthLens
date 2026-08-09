@@ -1,16 +1,4 @@
-# =========================================================
-# TEST SCRIPT — checks how accurate the SYMPTOM matching is
-# =========================================================
-# Run this AFTER build_model.py has already created disease_knowledge_base.csv
-#
-# What this does: takes the 42 real labeled cases in Testing.csv, and for each one,
-# only gives the matcher HALF of that disease's known symptoms (to simulate a real
-# person who doesn't list every single symptom), then checks if it still guesses
-# the right disease.
-#
-# Needs these files in the same folder:
-#   - disease_knowledge_base.csv   (created by build_model.py)
-#   - Testing.csv
+
 
 import pandas as pd
 import ast
@@ -48,7 +36,7 @@ for i, row in test_df.iterrows():
     actual = row['prognosis'].strip().lower()
     full_symptoms = [col.replace('_', ' ') for col in symptom_cols if row[col] == 1]
 
-    # Simulate a realistic user who only reports about half their symptoms
+   
     if len(full_symptoms) > 1:
         reported = random.sample(full_symptoms, k=max(1, len(full_symptoms)//2))
     else:
