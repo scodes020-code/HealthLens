@@ -23,7 +23,7 @@ import os
 import difflib
 import urllib.parse
 from datetime import datetime
-import joblib
+import pickle
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -79,7 +79,8 @@ def load_knowledge_base():
 @st.cache_resource
 def load_bmi_model():
     if os.path.exists('bmi_risk_model.pkl'):
-        return joblib.load('bmi_risk_model.pkl')
+        with open('bmi_risk_model.pkl', 'rb') as f:
+            return pickle.load(f)
     return None
 
 kb_df = load_knowledge_base()
@@ -166,7 +167,7 @@ def send_feedback_email(name, message):
         FEEDBACK_TO        = "scodes020@gmail.com" # where it lands (can be same as above)
     """
     try:
-        gmail_address = st.secrets["GMAIL_ADDRES"]
+        gmail_address = st.secrets["GMAIL_ADDRESS"]
         gmail_app_password = st.secrets["GMAIL_APP_PASSWORD"]
         feedback_to = st.secrets.get("FEEDBACK_TO", gmail_address)
     except Exception:
